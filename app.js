@@ -30,7 +30,7 @@ function handlePostSubmission(event) {
     event.preventDefault(); // フォームの送信を最初に停止 ⭐修正⭐
 
     // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
-    if (isEmergencyMode) {
+    function handlePostSubmission(event) {
         const categoryElement = document.querySelector('input[name="category"]:checked');
         if (!categoryElement) {
             alert("非常時モードでは、安否、被害、支援要請のいずれかを選択してください。");
@@ -43,7 +43,7 @@ function handlePostSubmission(event) {
         alert("つぶやき内容を入力してください。");
         return;
     }
-    // ... (以下、ジオロケーションAPIの取得処理へ続く)
+    event.preventDefault(); // フォームの送信を最初に停止
 }
 // ----------------------------------------------------
 // 3. データをFirestoreに保存する関数
