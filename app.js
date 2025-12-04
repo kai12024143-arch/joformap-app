@@ -160,8 +160,9 @@ modeToggle.addEventListener('click', () => {
     
     if (isEmergencyMode) {
         modeToggle.textContent = '通常モードに戻す';
-        emergencyCategories.style.display = 'block'; // カテゴリを表示
-        mapElement.style.borderColor = 'red'; // 緊急性を視覚的に伝える
+        // ⭐ ここを 'flex' に統一 ⭐
+        emergencyCategories.style.display = 'flex'; 
+        mapElement.style.borderColor = 'red';
         document.body.style.backgroundColor = '#fdd';
     } else {
         modeToggle.textContent = '非常時モードに切り替え';
@@ -170,8 +171,7 @@ modeToggle.addEventListener('click', () => {
         document.body.style.backgroundColor = 'white';
     }
 });
-
-
+    
 // ----------------------------------------------------
 // 6. イベントリスナーの設定
 // ----------------------------------------------------
