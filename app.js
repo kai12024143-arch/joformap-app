@@ -27,14 +27,7 @@ function initMap() {
 // 2. 位置情報を取得し、Firestoreに投稿する関数
 // ----------------------------------------------------
 function handlePostSubmission(event) {
-    event.preventDefault(); // フォームの送信を一旦停止
-
-    if (!postText.value.trim()) {
-        alert("つぶやき内容を入力してください。");
-        return;
-    }
-
-    // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
+ // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
     if (isEmergencyMode) {
         const categoryElement = document.querySelector('input[name="category"]:checked');
         if (!categoryElement) {
