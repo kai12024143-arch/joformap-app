@@ -27,23 +27,48 @@ function initMap() {
 // 2. 位置情報を取得し、Firestoreに投稿する関数
 // ----------------------------------------------------
 function handlePostSubmission(event) {
-    event.preventDefault(); // フォームの送信を最初に停止 ⭐修正⭐
+    event.preventDefault(); // フォームの送信を停止（最初に実行）
 
-    // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
-    function handlePostSubmission(event) {
-        const categoryElement = document.querySelector('input[name="category"]:checked');
-        if (!categoryElement) {
-            alert("非常時モードでは、安否、被害、支援要請のいずれかを選択してください。");
-            return; // 選択されていない場合は処理を中断
-        }
-    }
-    
-    // ... 投稿内容のチェックへ続く
     if (!postText.value.trim()) {
         alert("つぶやき内容を入力してください。");
         return;
     }
-    event.preventDefault(); // フォームの送信を最初に停止
+
+    // ⭐ 非常時モードのカテゴリ選択チェック
+    if (isEmergencyMode) {
+        const categoryElement = document.querySelector('input[name="category"]:checked');
+        if (!categoryElement) {
+            alert("非常時モードでは、安否、被害、支援要請のいずれかを選択してください。");
+            return;
+        }
+    }
+
+    // ジオロケーションAPIで現在地を取得
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                // 匿名化処理
+                const roundedLat = Math.round(lat * 1000) / 1000;
+                const roundedLng = Math.round(lng * 1000) / 1000;
+                savePost(roundedLat, roundedLng);
+            },
+            (error) => {
+                let errorMessage = '位置情報が取得できませんでした。';
+                // ... (エラーメッセージの切り替えロジックは省略せずに残してください)
+                alert("投稿失敗: " + errorMessage);
+                console.error("Geolocation Error: ", error);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 5000,
+                maximumAge: 0
+            }
+        );
+    } else {
+        alert("お使いのブラウザは位置情報取得に対応していません。");
+    }
 }
 // ----------------------------------------------------
 // 3. データをFirestoreに保存する関数
