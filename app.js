@@ -27,7 +27,9 @@ function initMap() {
 // 2. 位置情報を取得し、Firestoreに投稿する関数
 // ----------------------------------------------------
 function handlePostSubmission(event) {
- // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
+    event.preventDefault(); // フォームの送信を最初に停止 ⭐修正⭐
+
+    // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
     if (isEmergencyMode) {
         const categoryElement = document.querySelector('input[name="category"]:checked');
         if (!categoryElement) {
@@ -36,61 +38,13 @@ function handlePostSubmission(event) {
         }
     }
     
-    // ... ジオロケーションAPIで現在地を取得する処理へ続く
-    event.preventDefault(); // フォームの送信を一旦停止
-
+    // ... 投稿内容のチェックへ続く
     if (!postText.value.trim()) {
         alert("つぶやき内容を入力してください。");
         return;
     }
-
-    // ジオロケーションAPIで現在地を取得
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                // 取得成功時の処理
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-
-                // ⭐ 匿名化処理: 座標を丸める (例: 100m四方に丸める)
-                // 整数 x 100000 = 約 1.1メートル単位
-                const roundedLat = Math.round(lat * 1000) / 1000;
-                const roundedLng = Math.round(lng * 1000) / 1000;
-
-                savePost(roundedLat, roundedLng);
-            },
-            (error) => {
-                // ⭐ エラー処理: 位置情報取得失敗時の詳細なメッセージ
-                let errorMessage = '位置情報が取得できませんでした。';
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage += "ブラウザで位置情報へのアクセスが拒否されています。設定を確認してください。";
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage += "位置情報が利用できません。";
-                        break;
-                    case error.TIMEOUT:
-                        errorMessage += "位置情報の取得がタイムアウトしました。";
-                        break;
-                    case error.UNKNOWN_ERROR:
-                        errorMessage += "不明なエラーが発生しました。";
-                        break;
-                }
-                alert("投稿失敗: " + errorMessage);
-                console.error("Geolocation Error: ", error);
-            },
-            {
-                // ⭐ オプション設定: タイムアウトと精度を確保
-                enableHighAccuracy: true, // 高精度な取得を試みる
-                timeout: 5000,           // 5秒でタイムアウトさせる
-                maximumAge: 0            // キャッシュされた古い情報は使わない
-            }
-        );
-    } else {
-        alert("お使いのブラウザは位置情報取得に対応していません。");
-    }
+    // ... (以下、ジオロケーションAPIの取得処理へ続く)
 }
-
 // ----------------------------------------------------
 // 3. データをFirestoreに保存する関数
 // ----------------------------------------------------
@@ -186,4 +140,22 @@ modeToggle.addEventListener('click', () => {
 // ----------------------------------------------------
 // 6. イベントリスナーの設定
 // ----------------------------------------------------
-postForm.addEventListener('submit', handlePostSubmission);
+if (postForm) { // フォーム要素が存在するか確認
+    postForm.addEventListener('submit', handlePostSubmission);
+}
+// ⭐ modeToggleのイベントリスナーもここに記述する ⭐
+if (modeToggle) {
+    modeToggle.addEventListener('click', () => {
+        isEmergencyMode = !isEmergencyMode; // モードを反転
+        
+        if (isEmergencyMode) {
+            modeToggle.textContent = '通常モードに戻す';
+            emergencyCategories.style.display = 'flex'; // flexに変更
+            document.body.style.backgroundColor = '#fdd';
+        } else {
+            modeToggle.textContent = '非常時モードに切り替え';
+            emergencyCategories.style.display = 'none';
+            document.body.style.backgroundColor = 'white';
+        }
+    });
+}
