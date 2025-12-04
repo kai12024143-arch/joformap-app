@@ -18,20 +18,29 @@
     <form id="post-form">
         <textarea id="post-text" placeholder="つぶやき..."></textarea>
         <div id="emergency-categories" style="display:none;">
-           <div id="emergency-categories" style="display:none;" class="mb-3 flex justify-around p-2 bg-red-100 rounded-md">
-               
-　　　　 <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
-        <input type="radio" name="category" value="安否" class="mr-1 align-middle">
+            <div id="emergency-categories" style="display:none;" class="mb-3 flex justify-around p-2 bg-red-100 rounded-md">
+    
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded relative">
+        <input type="radio" name="category" value="安否" class="appearance-none peer mr-1" id="cat-anpi">
+        <span class="inline-block w-4 h-4 border border-red-700 rounded-full bg-white align-middle mr-1 peer-checked:bg-red-500 peer-checked:border-red-500"></span>
         安否
     </label>
-    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
-        <input type="radio" name="category" value="被害" class="mr-1 align-middle">
+
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded relative">
+        <input type="radio" name="category" value="被害" class="appearance-none peer mr-1" id="cat-higai">
+        <span class="inline-block w-4 h-4 border border-red-700 rounded-full bg-white align-middle mr-1 peer-checked:bg-red-500 peer-checked:border-red-500"></span>
         被害
     </label>
-    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
-        <input type="radio" name="category" value="支援要請" class="mr-1 align-middle">
+
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded relative">
+        <input type="radio" name="category" value="支援要請" class="appearance-none peer mr-1" id="cat-shien">
+        <span class="inline-block w-4 h-4 border border-red-700 rounded-full bg-white align-middle mr-1 peer-checked:bg-red-500 peer-checked:border-red-500"></span>
         支援要請
     </label>
+
+</div>
+           <div id="emergency-categories" style="display:none;" class="mb-3 flex justify-around p-2 bg-red-100 rounded-md">
+       
 
 </div>
         <button type="submit">投稿（位置情報必須）</button>
