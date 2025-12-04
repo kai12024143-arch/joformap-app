@@ -55,20 +55,30 @@ function handlePostSubmission(event) {
                 savePost(roundedLat, roundedLng);
             },
             (error) => {
-                let errorMessage = '位置情報が取得できませんでした。';
-                // ... (エラーメッセージの切り替えロジックは省略せずに残してください)
-                alert("投稿失敗: " + errorMessage);
-                console.error("Geolocation Error: ", error);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 5000,
-                maximumAge: 0
+            let errorMessage = '位置情報が取得できませんでした。';
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage += "ブラウザで位置情報へのアクセスが拒否されています。設定を確認してください。";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage += "位置情報が利用できません。";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage += "位置情報の取得がタイムアウトしました。";
+                    break;
+                case error.UNKNOWN_ERROR:
+                    errorMessage += "不明なエラーが発生しました。";
+                    break;
             }
-        );
-    } else {
-        alert("お使いのブラウザは位置情報取得に対応していません。");
-    }
+            alert("投稿失敗: " + errorMessage);
+            console.error("Geolocation Error: ", error);
+        },
+        {
+            // ... (オプション設定は省略)
+        }
+    );
+} else {
+    alert("お使いのブラウザは位置情報取得に対応していません。");
 }
 // ----------------------------------------------------
 // 3. データをFirestoreに保存する関数
