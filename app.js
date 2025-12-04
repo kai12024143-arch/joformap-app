@@ -34,6 +34,23 @@ function handlePostSubmission(event) {
         return;
     }
 
+    // ⭐ 修正追加: 非常時モードでカテゴリ選択を強制する
+    if (isEmergencyMode) {
+        const categoryElement = document.querySelector('input[name="category"]:checked');
+        if (!categoryElement) {
+            alert("非常時モードでは、安否、被害、支援要請のいずれかを選択してください。");
+            return; // 選択されていない場合は処理を中断
+        }
+    }
+    
+    // ... ジオロケーションAPIで現在地を取得する処理へ続く
+    event.preventDefault(); // フォームの送信を一旦停止
+
+    if (!postText.value.trim()) {
+        alert("つぶやき内容を入力してください。");
+        return;
+    }
+
     // ジオロケーションAPIで現在地を取得
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
