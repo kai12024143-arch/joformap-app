@@ -16,15 +16,16 @@
 
     <button id="mode-toggle">非常時モードに切り替え</button>
     <form id="post-form">
-        <textarea id="post-text" placeholder="つぶやき..."></textarea>
-        <div id="emergency-categories" style="display:none;">
-           <div id="emergency-categories" style="display:none;">
-    <label><input type="radio" name="category" value="安否"> 安否</label>
-    <label><input type="radio" name="category" value="被害"> 被害</label>
-    <label><input type="radio" name="category" value="支援要請"> 支援要請</label>
-</div>
-        <button type="submit">投稿（位置情報必須）</button>
-    </form>
+    <textarea id="post-text" placeholder="つぶやき..."></textarea>
+    
+    <div id="emergency-categories" style="display:none;">
+        <label><input type="radio" name="category" value="安否"> 安否</label>
+        <label><input type="radio" name="category" value="被害"> 被害</label>
+        <label><input type="radio" name="category" value="支援要請"> 支援要請</label>
+    </div>
+    
+    <button type="submit">投稿（位置情報必須）</button>
+</form>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
