@@ -1,10 +1,18 @@
 // Firestoreインスタンスの取得
 const db = firebase.firestore();
+
+// ⭐ HTML要素の取得をコードの実行前に確実に実行する
 const postForm = document.getElementById('post-form');
 const postText = document.getElementById('post-text');
 const mapElement = document.getElementById('map');
 const modeToggle = document.getElementById('mode-toggle');
 const emergencyCategories = document.getElementById('emergency-categories');
+// ⭐ (その他の変数は省略)
+
+let map;
+let isEmergencyMode = false;
+
+// ... (以下、initMap関数など、残りのコードが続きます)
 
 let map;
 let isEmergencyMode = false;
@@ -13,9 +21,15 @@ let isEmergencyMode = false;
 // 1. Google Mapの初期化関数
 // ----------------------------------------------------
 function initMap() {
+    // ⭐ 地図要素が存在するかチェック
+    if (!mapElement) {
+        console.error("地図表示エリアの要素（id='map'）が見つかりません。");
+        return; // 要素がない場合は処理を中断
+    }
+    
     // 地図の中心を常総市役所付近に設定
     const initialPos = { lat: 35.9897, lng: 139.9791 }; 
-    map = new google.maps.Map(mapElement, {
+    map = new google.maps.Map(mapElement, { // mapElement 変数を使用
         zoom: 12,
         center: initialPos,
     });
@@ -177,4 +191,14 @@ modeToggle.addEventListener('click', () => {
 // ----------------------------------------------------
 // 6. イベントリスナーの設定
 // ----------------------------------------------------
-postForm.addEventListener('submit', handlePostSubmission);
+// ⭐ モード切り替えボタンが存在する場合のみイベントを設定する
+if (modeToggle) {
+    modeToggle.addEventListener('click', () => {
+        // ... (以前修正したモード切替ロジックがここに入る) ...
+    });
+}
+
+// 投稿フォームのイベントリスナー
+if (postForm) {
+    postForm.addEventListener('submit', handlePostSubmission);
+}
