@@ -161,14 +161,15 @@ modeToggle.addEventListener('click', () => {
     
     if (isEmergencyMode) {
         modeToggle.textContent = '通常モードに戻す';
-        emergencyCategories.style.display = 'block'; // カテゴリを表示
-        mapElement.style.borderColor = 'red'; // 緊急性を視覚的に伝える
-        document.body.style.backgroundColor = '#fdd';
+        emergencyCategories.style.display = 'flex'; // ⭐ flex に変更 (横並びのため)
+        document.body.classList.add('emergency-background'); // CSSクラスを追加
+        modeToggle.classList.replace('bg-blue-500', 'bg-red-700'); // ボタンの色を赤に変更
+        // mapElement.style.borderColor = 'red'; // CSSでの境界線は省略
     } else {
         modeToggle.textContent = '非常時モードに切り替え';
-        emergencyCategories.style.display = 'none'; // カテゴリを非表示
-        mapElement.style.borderColor = 'black';
-        document.body.style.backgroundColor = 'white';
+        emergencyCategories.style.display = 'none';
+        document.body.classList.remove('emergency-background'); // CSSクラスを削除
+        modeToggle.classList.replace('bg-red-700', 'bg-blue-500'); // ボタンの色を青に戻す
     }
 });
 
