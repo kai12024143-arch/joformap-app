@@ -18,11 +18,24 @@
     <form id="post-form">
         <textarea id="post-text" placeholder="つぶやき..."></textarea>
         <div id="emergency-categories" style="display:none;">
-            <div id="emergency-categories" style="display:none;" class="mb-3 flex justify-around p-2 bg-red-100 rounded-md">
-        　　　<label class="text-red-700 font-semibold cursor-pointer"><input type="radio" name="category" value="安否" class="mr-1">安否</label>
-        　　 <label class="text-red-700 font-semibold cursor-pointer"><input type="radio" name="category" value="被害" class="mr-1">被害</label>
-            <label class="text-red-700 font-semibold cursor-pointer"><input type="radio" name="category" value="支援要請" class="mr-1">支援要請</label>
-        </div>
+           <div id="emergency-categories" style="display:none;" class="mb-3 flex justify-around p-2 bg-red-100 rounded-md">
+    
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
+        <input type="radio" name="category" value="安否" class="mr-1 align-middle">
+        安否
+    </label>
+
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
+        <input type="radio" name="category" value="被害" class="mr-1 align-middle">
+        被害
+    </label>
+
+    <label class="text-red-700 font-semibold cursor-pointer p-2 hover:bg-red-200 rounded">
+        <input type="radio" name="category" value="支援要請" class="mr-1 align-middle">
+        支援要請
+    </label>
+
+</div>
         <button type="submit">投稿（位置情報必須）</button>
     </form>
     
