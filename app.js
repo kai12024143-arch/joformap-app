@@ -81,32 +81,49 @@ function handlePostSubmission(event) {
     alert("お使いのブラウザは位置情報取得に対応していません。");
 }
 // ----------------------------------------------------
-// 3. データをFirestoreに保存する関数
+// 3. データをFirestoreに保存する関数（20個制限ルール付き）
 // ----------------------------------------------------
-function savePost(lat, lng) {
+async function savePost(lat, lng) {
     const categoryElement = document.querySelector('input[name="category"]:checked');
     const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
 
-    db.collection('posts').add({
-        text: postText.value,
-        lat: lat,
-        lng: lng,
-        category: category,
-        mode: isEmergencyMode ? 'emergency' : 'normal',
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    })
-    .then(() => {
+    try {
+        // ① 同じ座標（lat, lng）にある投稿を古い順に取得
+        const sameLocationPosts = await db.collection('posts')
+            .where('lat', '==', lat)
+            .where('lng', '==', lng)
+            .orderBy('timestamp', 'asc') // 古い順
+            .get();
+
+        // ② もし既に20個（またはそれ以上）あれば、古いものを削除
+        // 新しい1件を追加するので、19個以下になるまで消す
+        if (sameLocationPosts.size >= 20) {
+            const deleteCount = sameLocationPosts.size - 19; 
+            for (let i = 0; i < deleteCount; i++) {
+                await sameLocationPosts.docs[i].ref.delete();
+                console.log("古い投稿を制限（20個）のため削除しました。");
+            }
+        }
+
+        // ③ 新しい投稿を保存
+        await db.collection('posts').add({
+            text: postText.value,
+            lat: lat,
+            lng: lng,
+            category: category,
+            mode: isEmergencyMode ? 'emergency' : 'normal',
+            timestamp: firebase.firestore.Timestamp.now() // 即時スタンプ
+        });
+
         alert("投稿が完了しました！");
         postText.value = ''; // テキストエリアをクリア
-        // 投稿完了後にマップを再描画（またはリアルタイムリスナーが反応）
-        loadPosts();
-    })
-    .catch((error) => {
-        alert("データベースへの書き込み中にエラーが発生しました: " + error.message);
-        console.error("Firestore Write Error: ", error);
-    });
-}
+        loadPosts(); // マップを更新
 
+    } catch (error) {
+        alert("エラーが発生しました。Firebaseのインデックス作成が必要かもしれません。: " + error.message);
+        console.error("Save/Delete Error: ", error);
+    }
+}
 // ----------------------------------------------------
 // 4. Firestoreから投稿を読み込み、マップに表示する関数
 // ----------------------------------------------------
