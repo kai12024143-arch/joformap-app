@@ -4,28 +4,34 @@
     <meta charset="UTF-8">
     <title>常総コミュニティ防災プラットフォーム</title>
     <style>
+        /* 地図のサイズ設定 */
         #map {
-            height: 600px; /* 地図の高さ */
+            height: 600px; 
             width: 100%;
+            border: 2px solid black; /* 枠線を見やすく追加 */
+        }
+
+        /* 非常時モードのラベルデザイン */
+        #emergency-categories label {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+            margin-right: 15px; 
+            border: 1px solid #ff9999; 
+            border-radius: 5px;
+            background-color: #fff;
+            cursor: pointer;
+            color: #cc0000;
+        }
+
+        #emergency-categories label:hover {
+            background-color: #ffe0e0;
+        }
+
+        #emergency-categories input[type="radio"] {
+            margin-right: 5px;
         }
     </style>
-    #map {
-        height: 600px; /* 地図の高さ */
-        width: 100%;
-    }
-    #emergency-categories label {
-        padding: 5px 10px;
-        margin-right: 15px; 
-        border: 1px solid #ff9999; 
-        border-radius: 5px;
-        background-color: #fff;
-        cursor: pointer;
-        color: #cc0000; /* 文字色を赤くする */
-    }
-    #emergency-categories label:hover {
-        background-color: #ffe0e0; /* ホバー時の色 */
-    }
-</style>
 </head>
 <body>
     
