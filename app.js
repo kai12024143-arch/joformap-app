@@ -81,27 +81,90 @@ function handlePostSubmission(event) {
     alert("お使いのブラウザは位置情報取得に対応していません。");
 }
 // ----------------------------------------------------
-// 3. データをFirestoreに保存する関数（20個制限ルール付き）
+// 4. Firestoreから投稿を読み込み、マップに表示する関数
+// ----------------------------------------------------
+function loadPosts() {
+    // 24時間前の時刻を計算
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
+
+    // 24時間以内の投稿だけを取得（古いものは無視）
+    db.collection('posts')
+        .where('timestamp', '>', timestampThreshold)
+        .orderBy('timestamp', 'desc')
+        .limit(50)
+        .get().then(snapshot => {
+            
+            // マーカーをクリアする処理（もし必要ならここで行う）
+            // snapshot.forEach(doc => { ... マーカー設置処理 ... });
+            
+            // 既存の表示処理...
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                // マーカー作成などの処理（以前のコードと同じ）
+                const markerColor = data.mode === 'emergency' ? 'red' : 'blue';
+                const marker = new google.maps.Marker({
+                    position: { lat: data.lat, lng: data.lng },
+                    map: map,
+                    title: data.text,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: markerColor,
+                        fillOpacity: 0.9,
+                        scale: 7,
+                        strokeColor: 'white',
+                        strokeWeight: 1
+                    }
+                });
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div><strong>カテゴリー:</strong> ${data.category}<br><strong>つぶやき:</strong> ${data.text}</div>`
+                });
+
+                marker.addListener('click', () => {
+                    infoWindow.open(map, marker);
+                });
+            });
+        }).catch(err => {
+            console.error("読み込みエラー: ", err);
+        });
+}
+
+// ----------------------------------------------------
+// 3. データをFirestoreに保存する関数（24時間削除 & 20個制限）
 // ----------------------------------------------------
 async function savePost(lat, lng) {
     const categoryElement = document.querySelector('input[name="category"]:checked');
     const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
+    
+    // 現在時刻から24時間前を計算
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
 
     try {
-        // ① 同じ座標（lat, lng）にある投稿を古い順に取得
+        // ① 【24時間期限切れ削除】全投稿の中から24時間以上前のものを探して削除
+        const oldPosts = await db.collection('posts')
+            .where('timestamp', '<', timestampThreshold)
+            .get();
+        
+        const deletePromises = [];
+        oldPosts.forEach(doc => {
+            deletePromises.push(doc.ref.delete());
+        });
+        await Promise.all(deletePromises);
+        if(oldPosts.size > 0) console.log(`${oldPosts.size}件の古い投稿を削除しました。`);
+
+        // ② 【20個制限削除】同じ座標にある投稿を確認
         const sameLocationPosts = await db.collection('posts')
             .where('lat', '==', lat)
             .where('lng', '==', lng)
-            .orderBy('timestamp', 'asc') // 古い順
+            .orderBy('timestamp', 'asc')
             .get();
 
-        // ② もし既に20個（またはそれ以上）あれば、古いものを削除
-        // 新しい1件を追加するので、19個以下になるまで消す
         if (sameLocationPosts.size >= 20) {
             const deleteCount = sameLocationPosts.size - 19; 
             for (let i = 0; i < deleteCount; i++) {
                 await sameLocationPosts.docs[i].ref.delete();
-                console.log("古い投稿を制限（20個）のため削除しました。");
             }
         }
 
@@ -112,60 +175,17 @@ async function savePost(lat, lng) {
             lng: lng,
             category: category,
             mode: isEmergencyMode ? 'emergency' : 'normal',
-            timestamp: firebase.firestore.Timestamp.now() // 即時スタンプ
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         alert("投稿が完了しました！");
-        postText.value = ''; // テキストエリアをクリア
-        loadPosts(); // マップを更新
+        postText.value = '';
+        loadPosts();
 
     } catch (error) {
-        alert("エラーが発生しました。Firebaseのインデックス作成が必要かもしれません。: " + error.message);
+        alert("エラーが発生しました。詳細はコンソールを確認してください。");
         console.error("Save/Delete Error: ", error);
     }
-}
-// ----------------------------------------------------
-// 4. Firestoreから投稿を読み込み、マップに表示する関数
-// ----------------------------------------------------
-function loadPosts() {
-    db.collection('posts').orderBy('timestamp', 'desc').limit(50).get().then(snapshot => {
-        // マーカーをクリアする処理（省略）
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const markerColor = data.mode === 'emergency' ? 'red' : 'blue';
-
-            // マーカーを地図に追加
-            const marker = new google.maps.Marker({
-                position: { lat: data.lat, lng: data.lng },
-                map: map,
-                title: data.text,
-                icon: {
-                    // カテゴリに応じて色やアイコンを変えることも可能
-                    path: google.maps.SymbolPath.CIRCLE,
-                    fillColor: markerColor,
-                    fillOpacity: 0.9,
-                    scale: 7,
-                    strokeColor: 'white',
-                    strokeWeight: 1
-                }
-            });
-
-            // 情報ウィンドウ（ポップアップ）の設定
-            const infoWindow = new google.maps.InfoWindow({
-                content: `
-                    <div>
-                        <strong>カテゴリー:</strong> ${data.category}<br>
-                        <strong>つぶやき:</strong> ${data.text}<br>
-                        <em>(${new Date(data.timestamp.toDate()).toLocaleTimeString()})</em>
-                    </div>
-                `
-            });
-
-            marker.addListener('click', () => {
-                infoWindow.open(map, marker);
-            });
-        });
-    });
 }
 
 
