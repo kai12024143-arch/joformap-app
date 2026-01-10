@@ -8,7 +8,7 @@
         #map {
             height: 600px; 
             width: 100%;
-            border: 2px solid black; /* 枠線を見やすく追加 */
+            border: 1px solid #ccc;
         }
 
         /* 非常時モードのラベルデザイン */
@@ -34,27 +34,20 @@
     </style>
 </head>
 <body>
-    
     <div id="map">地図表示エリア</div>
 
     <button id="mode-toggle">非常時モードに切り替え</button>
     <form id="post-form">
-    <textarea id="post-text" placeholder="つぶやき..."></textarea>
-    
-  <div id="emergency-categories" style="display:none; gap: 10px; margin: 10px 0;">
-    <label style="background:#fff; border:1px solid #f00; padding:5px; border-radius:5px; color:#f00;">
-        <input type="radio" name="category" value="安否"> 安否
-    </label>
-    <label style="background:#fff; border:1px solid #f00; padding:5px; border-radius:5px; color:#f00;">
-        <input type="radio" name="category" value="被害"> 被害
-    </label>
-    <label style="background:#fff; border:1px solid #f00; padding:5px; border-radius:5px; color:#f00;">
-        <input type="radio" name="category" value="支援要請"> 支援要請
-    </label>
-</div>
-    
-    <button type="submit">投稿（位置情報必須）</button>
-</form>
+        <textarea id="post-text" placeholder="つぶやき..."></textarea>
+        
+        <div id="emergency-categories" style="display:none; gap: 10px; margin: 10px 0;">
+            <label><input type="radio" name="category" value="安否"> 安否</label>
+            <label><input type="radio" name="category" value="被害"> 被害</label>
+            <label><input type="radio" name="category" value="支援要請"> 支援要請</label>
+        </div>
+        
+        <button type="submit">投稿（位置情報必須）</button>
+    </form>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
@@ -62,20 +55,17 @@
 
     <script>
         const firebaseConfig = {
-  apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
-  authDomain: "joso-13c95.firebaseapp.com",
-  projectId: "joso-13c95",
-  storageBucket: "joso-13c95.firebasestorage.app",
-  messagingSenderId: "659788884587",
-  appId: "1:659788884587:web:39b9a1b840039c24875f2e"
-};
-        // Firebaseの初期化を実行
+            apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
+            authDomain: "joso-13c95.firebaseapp.com",
+            projectId: "joso-13c95",
+            storageBucket: "joso-13c95.firebasestorage.app",
+            messagingSenderId: "659788884587",
+            appId: "1:659788884587:web:39b9a1b840039c24875f2e"
+        };
         firebase.initializeApp(firebaseConfig);
- </script>
+    </script>
 
     <script src="app.js"></script>
-
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7hvh-OUCTVM62geqN543IMtgEWl-eeTQ&callback=initMap"></script>
-
 </body>
 </html>
