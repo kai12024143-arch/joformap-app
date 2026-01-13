@@ -1,7 +1,24 @@
 // ==========================================
-// 1. 基本設定と変数
+// 1. Firebaseの設定（あなたのプロジェクト用）
 // ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
+    authDomain: "joso-13c95.firebaseapp.com",
+    projectId: "joso-13c95",
+    storageBucket: "joso-13c95.firebasestorage.app",
+    messagingSenderId: "659788884587",
+    appId: "1:659788884587:web:39b9a1b840039c24875f2e"
+};
+
+// まだ初期化されていなければ初期化する
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.firestore();
+
+// ==========================================
+// 2. HTML要素の取得
+// ==========================================
 const postForm = document.getElementById('post-form');
 const postText = document.getElementById('post-text');
 const mapElement = document.getElementById('map');
@@ -10,26 +27,28 @@ const emergencyCategories = document.getElementById('emergency-categories');
 
 let map;
 let isEmergencyMode = false;
-let markers = []; // 地図上のマーカーを管理
+let markers = [];
 
 // ==========================================
-// 2. 地図の初期化 (Google Mapsが呼ぶ)
+// 3. 地図の読み込み（最重要：エラーの元を確実に定義）
 // ==========================================
-function initMap() {
-    const initialPos = { lat: 35.9897, lng: 139.9791 }; // 常総市付近
+window.initMap = function() {
+    const initialPos = { lat: 35.9897, lng: 139.9791 }; 
     map = new google.maps.Map(mapElement, {
         zoom: 12,
         center: initialPos,
     });
-    // 地図ができたら投稿を読み込む
-    loadPosts();
-}
+    // loadPostsを確実に呼ぶ
+    if (typeof loadPosts === 'function') {
+        loadPosts();
+    }
+};
 
 // ==========================================
-// 3. 投稿を読み込んで表示する (これがエラーの原因でした)
+// 4. 投稿を読み込んで「4個まで」まとめる関数
 // ==========================================
 function loadPosts() {
-    // 古いマーカーを全部消す
+    console.log("データの読み込みを開始します...");
     markers.forEach(m => m.setMap(null));
     markers = [];
 
@@ -43,20 +62,12 @@ function loadPosts() {
         .then(snapshot => {
             const groupedPosts = {};
 
-            // 座標ごとに投稿をまとめる
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const posKey = `${data.lat}_${data.lng}`;
-                
                 if (!groupedPosts[posKey]) {
-                    groupedPosts[posKey] = { 
-                        lat: data.lat, 
-                        lng: data.lng, 
-                        mode: data.mode, 
-                        contents: [] 
-                    };
+                    groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
                 }
-                // 1つの場所に最大4件まで貯める
                 if (groupedPosts[posKey].contents.length < 4) {
                     groupedPosts[posKey].contents.push({
                         text: data.text,
@@ -66,7 +77,6 @@ function loadPosts() {
                 }
             });
 
-            // まとめたグループをマーカーとして地図に置く
             Object.values(groupedPosts).forEach(group => {
                 const marker = new google.maps.Marker({
                     position: { lat: group.lat, lng: group.lng },
@@ -81,7 +91,6 @@ function loadPosts() {
                     }
                 });
 
-                // 吹き出し（インフォウィンドウ）の中身を作成
                 const html = group.contents.map(c => 
                     `<div style="border-bottom:1px solid #eee; padding:5px; color:black; min-width:150px;">
                         <b>[${c.category}]</b> <small>${c.time}</small><br>${c.text}
@@ -92,27 +101,25 @@ function loadPosts() {
                 marker.addListener('click', () => infoWindow.open(map, marker));
                 markers.push(marker);
             });
-            console.log("読み込み完了！");
+            console.log("読み込み完了！現在のピン数:", Object.keys(groupedPosts).length);
         })
-        .catch(err => console.error("読み込みエラー:", err));
+        .catch(err => console.error("Firestoreエラー:", err));
 }
 
 // ==========================================
-// 4. 投稿を保存する (4個制限)
+// 5. 投稿の保存
 // ==========================================
 async function savePost(lat, lng) {
     const categoryElement = document.querySelector('input[name="category"]:checked');
     const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
 
     try {
-        // 同じ場所の投稿をチェック
         const sameLocationPosts = await db.collection('posts')
             .where('lat', '==', lat)
             .where('lng', '==', lng)
             .orderBy('timestamp', 'asc')
             .get();
 
-        // 4個以上なら古い順に消す
         if (sameLocationPosts.size >= 4) {
             const deleteCount = sameLocationPosts.size - 3; 
             for (let i = 0; i < deleteCount; i++) {
@@ -120,7 +127,6 @@ async function savePost(lat, lng) {
             }
         }
 
-        // 新しく保存
         await db.collection('posts').add({
             text: postText.value,
             lat: lat,
@@ -132,32 +138,35 @@ async function savePost(lat, lng) {
 
         alert("投稿しました！");
         postText.value = '';
-        loadPosts(); // 地図を更新
+        loadPosts();
 
     } catch (error) {
         console.error("保存失敗:", error);
-        alert("エラー：Firebaseのインデックス作成が必要かもしれません。コンソールを確認してください。");
+        alert("インデックス作成が必要です。コンソールのリンクをクリックしてください。");
     }
 }
 
 // ==========================================
-// 5. イベント設定
+// 6. イベント設定
 // ==========================================
-postForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (!postText.value.trim()) return;
+if (postForm) {
+    postForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!postText.value.trim()) return;
 
-    navigator.geolocation.getCurrentPosition((pos) => {
-        // 座標を少し丸める（約100m範囲でまとめるため）
-        const lat = Math.round(pos.coords.latitude * 1000) / 1000;
-        const lng = Math.round(pos.coords.longitude * 1000) / 1000;
-        savePost(lat, lng);
-    }, (err) => alert("位置情報をオンにしてください"));
-});
+        navigator.geolocation.getCurrentPosition((pos) => {
+            const lat = Math.round(pos.coords.latitude * 1000) / 1000;
+            const lng = Math.round(pos.coords.longitude * 1000) / 1000;
+            savePost(lat, lng);
+        }, (err) => alert("位置情報をオンにしてください"));
+    });
+}
 
-modeToggle.addEventListener('click', () => {
-    isEmergencyMode = !isEmergencyMode;
-    modeToggle.textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
-    emergencyCategories.style.display = isEmergencyMode ? 'flex' : 'none';
-    document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : 'white';
-});
+if (modeToggle) {
+    modeToggle.addEventListener('click', () => {
+        isEmergencyMode = !isEmergencyMode;
+        modeToggle.textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
+        emergencyCategories.style.display = isEmergencyMode ? 'flex' : 'none';
+        document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : 'white';
+    });
+}
