@@ -65,12 +65,16 @@ async function loadPosts() {
     markers = [];
 
     try {
+        // タイムアウトを設けて、粘り強く取得する
         const snapshot = await db.collection('posts')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .get();
 
-        if (snapshot.empty) return;
+        if (snapshot.empty) {
+            console.log("まだデータがありません");
+            return;
+        }
 
         const groupedPosts = {};
         const bounds = new google.maps.LatLngBounds();
@@ -94,31 +98,45 @@ async function loadPosts() {
         });
 
         Object.values(groupedPosts).forEach(group => {
+            // マーカーを少し大きく、目立つようにしました
             const marker = new google.maps.Marker({
                 position: { lat: group.lat, lng: group.lng },
                 map: map,
                 icon: {
                     path: google.maps.SymbolPath.CIRCLE,
                     fillColor: group.mode === 'emergency' ? '#FF0000' : '#0000FF',
-                    fillOpacity: 0.8, scale: 12, strokeColor: 'white', strokeWeight: 2
+                    fillOpacity: 0.9, scale: 14, strokeColor: 'white', strokeWeight: 3
                 },
-                animation: google.maps.Animation.DROP // 落ちてくるアニメで存在をアピール
+                animation: google.maps.Animation.BOUNCE // ぴょんぴょん跳ねさせて存在を主張！
             });
 
+            // 跳ねるのを止める（3秒後）
+            setTimeout(() => marker.setAnimation(null), 3000);
+
             const html = group.contents.map(c => 
-                `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important;">
-                    <b style="color:red;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
-                    <div style="margin-top:4px; font-weight:bold; color:black;">${c.text}</div>
+                `<div style="border-bottom:1px solid #ccc; padding:10px; color:black !important; background:white;">
+                    <b style="color:red; font-size:16px;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
+                    <div style="margin-top:5px; font-weight:bold; font-size:15px; color:black;">${c.text}</div>
                 </div>`
             ).join('');
 
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="padding:10px; max-width:220px; background:white;">${html}</div>`
+                content: `<div style="padding:5px; max-width:240px; background:white; border-radius:10px;">${html}</div>`
             });
 
             marker.addListener('click', () => infoWindow.open(map, marker));
             markers.push(marker);
         });
+
+        // 投稿がある場所に自動ズーム（これで迷子になりません）
+        map.fitBounds(bounds);
+        console.log("ついに！表示に成功しました！");
+
+    } catch (err) {
+        console.error("ネットが弱いです。3秒後に再チャレンジします:", err);
+        setTimeout(loadPosts, 3000); 
+    }
+}
 
         // 投稿がある場所に強制的に移動！
         map.fitBounds(bounds);
