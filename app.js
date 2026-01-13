@@ -121,11 +121,11 @@ async function savePost(lat, lng) {
 // ----------------------------------------------------
 // 4. 投稿を読み込む関数
 // ----------------------------------------------------
-// マーカーを管理するための配列を一番上（dbの定義の下あたり）に追加
+// マーカーを管理する配列（関数の外、一番上に置いてください）
 let markers = []; 
 
 function loadPosts() {
-    // 1. 地図上の古いマーカーをすべて削除
+    // ① 地図上の古いマーカーをすべて消して空にする
     markers.forEach(m => m.setMap(null));
     markers = [];
 
@@ -134,17 +134,20 @@ function loadPosts() {
 
     db.collection('posts')
         .where('timestamp', '>', timestampThreshold)
-        .orderBy('timestamp', 'desc')
+        .orderBy('timestamp', 'desc') // 新しい順に取得
         .limit(50)
         .get()
         .then(snapshot => {
+            let i = 0;
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const markerColor = data.mode === 'emergency' ? 'red' : 'blue';
 
+                // ② zIndex（重ね順）を設定。新しいほど数字を大きくして手前に出す
                 const marker = new google.maps.Marker({
                     position: { lat: data.lat, lng: data.lng },
                     map: map,
+                    zIndex: 1000 - i, // これで最新が一番上にくる
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
                         fillColor: markerColor,
@@ -155,17 +158,18 @@ function loadPosts() {
                     }
                 });
 
-                // 2. 新しいマーカーを配列に保存
                 markers.push(marker);
+                i++;
 
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `<div><strong>[${data.category}]</strong><br>${data.text}</div>`
+                    content: `<div style="color:black;"><strong>[${data.category}]</strong><br>${data.text}</div>`
                 });
 
                 marker.addListener('click', () => {
                     infoWindow.open(map, marker);
                 });
             });
+            console.log("再読み込み完了！現在の表示件数:", markers.length);
         });
 }
 // ----------------------------------------------------
