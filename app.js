@@ -121,7 +121,14 @@ async function savePost(lat, lng) {
 // ----------------------------------------------------
 // 4. 投稿を読み込む関数
 // ----------------------------------------------------
+// マーカーを管理するための配列を一番上（dbの定義の下あたり）に追加
+let markers = []; 
+
 function loadPosts() {
+    // 1. 地図上の古いマーカーをすべて削除
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
 
@@ -131,7 +138,6 @@ function loadPosts() {
         .limit(50)
         .get()
         .then(snapshot => {
-            // ここでは簡易的にマップ更新（本来はマーカークリアが必要ですが省略）
             snapshot.forEach(doc => {
                 const data = doc.data();
                 const markerColor = data.mode === 'emergency' ? 'red' : 'blue';
@@ -139,7 +145,6 @@ function loadPosts() {
                 const marker = new google.maps.Marker({
                     position: { lat: data.lat, lng: data.lng },
                     map: map,
-                    title: data.text,
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
                         fillColor: markerColor,
@@ -149,6 +154,9 @@ function loadPosts() {
                         strokeWeight: 2
                     }
                 });
+
+                // 2. 新しいマーカーを配列に保存
+                markers.push(marker);
 
                 const infoWindow = new google.maps.InfoWindow({
                     content: `<div><strong>[${data.category}]</strong><br>${data.text}</div>`
@@ -160,7 +168,6 @@ function loadPosts() {
             });
         });
 }
-
 // ----------------------------------------------------
 // 5. モード切替とイベント設定
 // ----------------------------------------------------
