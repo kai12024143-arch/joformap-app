@@ -5,73 +5,162 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>常総コミュニティ防災プラットフォーム</title>
     <style>
-        #map {
-            height: 600px;
-            width: 100%;
-            border: 2px solid #333;
-            margin-bottom: 20px;
-        }
-        body {
-            font-family: sans-serif;
-            padding: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        #post-text {
-            width: 100%;
-            height: 80px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-        }
-        #emergency-categories {
-            display: none;
-            gap: 15px;
-            margin-bottom: 15px;
-            padding: 10px;
-            background-color: #ffe0e0;
-            border-radius: 5px;
-        }
-        #emergency-categories label {
-            display: inline-flex;
-            align-items: center;
-            padding: 5px 10px;
-            border: 1px solid #ff4444;
-            background-color: white;
-            border-radius: 5px;
-            color: #d32f2f;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        #mode-toggle {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin-bottom: 15px;
-            cursor: pointer;
-        }
+        #map { height: 600px; width: 100%; border: 2px solid #333; margin-bottom: 20px; }
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        #post-text { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; }
+        #emergency-categories { display: none; gap: 15px; margin-bottom: 15px; padding: 10px; background-color: #ffe0e0; border-radius: 5px; }
+        #emergency-categories label { display: inline-flex; align-items: center; padding: 5px 10px; border: 1px solid #ff4444; background-color: white; border-radius: 5px; color: #d32f2f; cursor: pointer; font-weight: bold; }
+        #mode-toggle { padding: 10px 20px; font-size: 16px; margin-bottom: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
-
     <button id="mode-toggle">非常時モードに切り替え</button>
-
     <form id="post-form">
         <textarea id="post-text" placeholder="状況をつぶやいてください..."></textarea>
-        
         <div id="emergency-categories">
             <label><input type="radio" name="category" value="被害無し"> 被害無し</label>
             <label><input type="radio" name="category" value="被害あり"> 被害あり</label>
             <label><input type="radio" name="category" value="支援要請"> 支援要請</label>
         </div>
-        
         <button type="submit" style="padding:10px 20px; font-size:16px;">投稿（位置情報必須）</button>
     </form>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
-    <script src="app.js"></script>
+    <script>
+        // Firebase初期化
+        const firebaseConfig = {
+            apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
+            authDomain: "joso-13c95.firebaseapp.com",
+            projectId: "joso-13c95",
+            storageBucket: "joso-13c95.firebasestorage.app",
+            messagingSenderId: "659788884587",
+            appId: "1:659788884587:web:39b9a1b840039c24875f2e"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let map;
+        let isEmergencyMode = false;
+        let markers = [];
+
+        // 地図の初期化
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                zoom: 12,
+                center: { lat: 35.9897, lng: 139.9791 }
+            });
+            loadPosts();
+        }
+
+        // 投稿を読み込んで1つの窓にまとめる関数
+        function loadPosts() {
+            markers.forEach(m => m.setMap(null));
+            markers = [];
+            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
+
+            db.collection('posts')
+                .where('timestamp', '>', timestampThreshold)
+                .orderBy('timestamp', 'desc')
+                .get()
+                .then(snapshot => {
+                    const groupedPosts = {};
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const posKey = `${data.lat}_${data.lng}`;
+                        if (!groupedPosts[posKey]) {
+                            groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
+                        }
+                        if (groupedPosts[posKey].contents.length < 4) {
+                            groupedPosts[posKey].contents.push({
+                                text: data.text,
+                                category: data.category,
+                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : ''
+                            });
+                        }
+                    });
+
+                    Object.values(groupedPosts).forEach(group => {
+                        const marker = new google.maps.Marker({
+                            position: { lat: group.lat, lng: group.lng },
+                            map: map,
+                            icon: {
+                                path: google.maps.SymbolPath.CIRCLE,
+                                fillColor: group.mode === 'emergency' ? 'red' : 'blue',
+                                fillOpacity: 0.8, scale: 10, strokeColor: 'white', strokeWeight: 2
+                            }
+                        });
+                        const html = group.contents.map(c => 
+                            `<div style="border-bottom:1px solid #eee; padding:5px; color:black;">
+                                <b>[${c.category}]</b> <small>${c.time}</small><br>${c.text}
+                            </div>`
+                        ).join('');
+                        const infoWindow = new google.maps.InfoWindow({ content: `<div style="min-width:150px">${html}</div>` });
+                        marker.addListener('click', () => infoWindow.open(map, marker));
+                        markers.push(marker);
+                    });
+                }).catch(err => {
+                    console.error("読み込み失敗:", err);
+                    alert("Firebaseコンソールで『インデックス作成』が必要です。コンソールのリンクをクリックしてください。");
+                });
+        }
+
+        // 投稿を保存する関数 (4個制限)
+        async function savePost(lat, lng) {
+            const categoryElement = document.querySelector('input[name="category"]:checked');
+            const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
+            const postText = document.getElementById('post-text');
+
+            try {
+                const sameLocationPosts = await db.collection('posts')
+                    .where('lat', '==', lat)
+                    .where('lng', '==', lng)
+                    .orderBy('timestamp', 'asc').get();
+
+                if (sameLocationPosts.size >= 4) {
+                    const deleteCount = sameLocationPosts.size - 3; 
+                    for (let i = 0; i < deleteCount; i++) {
+                        await sameLocationPosts.docs[i].ref.delete();
+                    }
+                }
+
+                await db.collection('posts').add({
+                    text: postText.value, lat: lat, lng: lng, category: category,
+                    mode: isEmergencyMode ? 'emergency' : 'normal',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                alert("投稿しました！同じ場所で最大4個まで表示されます。");
+                postText.value = '';
+                loadPosts();
+            } catch (error) {
+                console.error("保存失敗:", error);
+                alert("エラーが発生しました。コンソールを確認してください。");
+            }
+        }
+
+        // ボタンの動作設定
+        document.getElementById('post-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = document.getElementById('post-text').value;
+            if (!text.trim()) return;
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = Math.round(pos.coords.latitude * 1000) / 1000;
+                const lng = Math.round(pos.coords.longitude * 1000) / 1000;
+                savePost(lat, lng);
+            }, (err) => alert("位置情報をオンにしてください"));
+        });
+
+        document.getElementById('mode-toggle').addEventListener('click', () => {
+            isEmergencyMode = !isEmergencyMode;
+            document.getElementById('mode-toggle').textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
+            document.getElementById('emergency-categories').style.display = isEmergencyMode ? 'flex' : 'none';
+            document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : 'white';
+        });
+    </script>
 
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7hvh-OUCTVM62geqN543IMtgEWl-eeTQ&callback=initMap"></script>
 
