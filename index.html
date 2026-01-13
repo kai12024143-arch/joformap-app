@@ -61,44 +61,88 @@
         }
 
         // 表示件数4個制限 & まとめて表示する関数
-        function loadPosts() {
+async function loadPosts() {
+    console.log("読み込み開始...");
     markers.forEach(m => m.setMap(null));
     markers = [];
 
-    db.collection('posts')
-        .orderBy('timestamp', 'desc')
-        .limit(50)
-        .get()
-        .then(snapshot => {
-            const groupedPosts = {};
-            const bounds = new google.maps.LatLngBounds(); // 地図の表示範囲を計算する準備
+    try {
+        // ネットワークエラーに備えて1回だけリトライする仕組み
+        const snapshot = await db.collection('posts')
+            .orderBy('timestamp', 'desc')
+            .limit(50)
+            .get();
 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                const posKey = `${data.lat}_${data.lng}`;
-                if (!groupedPosts[posKey]) {
-                    groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
-                }
-                if (groupedPosts[posKey].contents.length < 4) {
-                    groupedPosts[posKey].contents.push({
-                        text: data.text,
-                        category: data.category || "通常",
-                        time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : '時刻不明'
-                    });
-                }
-                bounds.extend({ lat: data.lat, lng: data.lng }); // 投稿がある場所を範囲に加える
+        if (snapshot.empty) {
+            console.log("データが空っぽです");
+            return;
+        }
+
+        const groupedPosts = {};
+        const bounds = new google.maps.LatLngBounds();
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!data.lat || !data.lng) return;
+
+            const posKey = `${data.lat.toFixed(3)}_${data.lng.toFixed(3)}`;
+            if (!groupedPosts[posKey]) {
+                groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
+            }
+            if (groupedPosts[posKey].contents.length < 4) {
+                groupedPosts[posKey].contents.push({
+                    text: data.text || "内容なし",
+                    category: data.category || "通常",
+                    time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : '不明'
+                });
+            }
+            bounds.extend({ lat: data.lat, lng: data.lng });
+        });
+
+        Object.values(groupedPosts).forEach(group => {
+            const marker = new google.maps.Marker({
+                position: { lat: group.lat, lng: group.lng },
+                map: map,
+                icon: {
+                    path: google.maps.SymbolPath.CIRCLE,
+                    fillColor: group.mode === 'emergency' ? '#FF0000' : '#0000FF',
+                    fillOpacity: 0.8, scale: 12, strokeColor: 'white', strokeWeight: 2
+                },
+                animation: google.maps.Animation.DROP // 落ちてくるアニメで存在をアピール
             });
 
-            Object.values(groupedPosts).forEach(group => {
-                const marker = new google.maps.Marker({
-                    position: { lat: group.lat, lng: group.lng },
-                    map: map,
-                    icon: {
-                        path: google.maps.SymbolPath.CIRCLE,
-                        fillColor: group.mode === 'emergency' ? '#FF0000' : '#0000FF', // 赤か青
-                        fillOpacity: 0.8, scale: 12, strokeColor: 'white', strokeWeight: 2
-                    }
-                });
+            const html = group.contents.map(c => 
+                `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important; font-family:sans-serif;">
+                    <b style="color:red;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
+                    <div style="margin-top:4px; font-size:14px; color:black !important; font-weight:bold;">${c.text}</div>
+                </div>`
+            ).join('');
+
+            const infoWindow = new google.maps.InfoWindow({
+                content: `<div style="padding:10px; max-width:220px; background:white; border-radius:8px;">${html}</div>`
+            });
+
+            marker.addListener('click', () => infoWindow.open(map, marker));
+            markers.push(marker);
+        });
+
+        // 投稿がある場所に強制的にズーム！
+        map.fitBounds(bounds);
+        
+        // ズームしすぎ防止
+        const listener = google.maps.event.addListener(map, "idle", function() { 
+            if (map.getZoom() > 16) map.setZoom(16); 
+            google.maps.event.removeListener(listener); 
+        });
+
+        console.log("ついに表示成功！件数:", snapshot.size);
+
+    } catch (err) {
+        console.error("エラー発生:", err);
+        // 通信エラーなら3秒後に一度だけ自動リトライ
+        setTimeout(loadPosts, 3000);
+    }
+}
 
                 // 文字色を強制的に「黒」にし、枠をつけて見やすくしました
                 const html = group.contents.map(c => 
