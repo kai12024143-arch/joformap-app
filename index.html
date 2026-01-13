@@ -62,58 +62,68 @@
 
         // 表示件数4個制限 & まとめて表示する関数
         function loadPosts() {
-            markers.forEach(m => m.setMap(null));
-            markers = [];
+    markers.forEach(m => m.setMap(null));
+    markers = [];
 
-            db.collection('posts')
-                .orderBy('timestamp', 'desc')
-                .limit(50)
-                .get()
-                .then(snapshot => {
-                    const groupedPosts = {};
-                    snapshot.forEach(doc => {
-                        const data = doc.data();
-                        const posKey = `${data.lat}_${data.lng}`;
-                        
-                        if (!groupedPosts[posKey]) {
-                            groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
-                        }
-                        // 同じ場所に最大4件まで
-                        if (groupedPosts[posKey].contents.length < 4) {
-                            groupedPosts[posKey].contents.push({
-                                text: data.text,
-                                category: data.category || "通常",
-                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : ''
-                            });
-                        }
+    db.collection('posts')
+        .orderBy('timestamp', 'desc')
+        .limit(50)
+        .get()
+        .then(snapshot => {
+            const groupedPosts = {};
+            const bounds = new google.maps.LatLngBounds(); // 地図の表示範囲を計算する準備
+
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const posKey = `${data.lat}_${data.lng}`;
+                if (!groupedPosts[posKey]) {
+                    groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
+                }
+                if (groupedPosts[posKey].contents.length < 4) {
+                    groupedPosts[posKey].contents.push({
+                        text: data.text,
+                        category: data.category || "通常",
+                        time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : '時刻不明'
                     });
+                }
+                bounds.extend({ lat: data.lat, lng: data.lng }); // 投稿がある場所を範囲に加える
+            });
 
-                    Object.values(groupedPosts).forEach(group => {
-                        const marker = new google.maps.Marker({
-                            position: { lat: group.lat, lng: group.lng },
-                            map: map,
-                            icon: {
-                                path: google.maps.SymbolPath.CIRCLE,
-                                fillColor: group.mode === 'emergency' ? 'red' : 'blue',
-                                fillOpacity: 0.8, scale: 10, strokeColor: 'white', strokeWeight: 2
-                            }
-                        });
-
-                        const html = group.contents.map(c => 
-                            `<div style="border-bottom:1px solid #eee; padding:5px; color:black;">
-                                <b>[${c.category}]</b> <small>${c.time}</small><br>${c.text}
-                            </div>`
-                        ).join('');
-
-                        const infoWindow = new google.maps.InfoWindow({ content: `<div style="min-width:180px">${html}</div>` });
-                        marker.addListener('click', () => infoWindow.open(map, marker));
-                        markers.push(marker);
-                    });
-                    console.log("再読み込み完了！現在の表示地点数:", Object.keys(groupedPosts).length);
-                }).catch(err => {
-                    console.error("読み込み失敗:", err);
+            Object.values(groupedPosts).forEach(group => {
+                const marker = new google.maps.Marker({
+                    position: { lat: group.lat, lng: group.lng },
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        fillColor: group.mode === 'emergency' ? '#FF0000' : '#0000FF', // 赤か青
+                        fillOpacity: 0.8, scale: 12, strokeColor: 'white', strokeWeight: 2
+                    }
                 });
-        }
+
+                // 文字色を強制的に「黒」にし、枠をつけて見やすくしました
+                const html = group.contents.map(c => 
+                    `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important; font-family:sans-serif;">
+                        <b style="color:red;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
+                        <div style="margin-top:4px; font-size:14px; color:black !important;">${c.text}</div>
+                    </div>`
+                ).join('');
+
+                const infoWindow = new google.maps.InfoWindow({
+                    content: `<div style="padding:10px; max-width:200px; background:white;">${html}</div>`
+                });
+
+                marker.addListener('click', () => infoWindow.open(map, marker));
+                markers.push(marker);
+            });
+
+            // 投稿がある場所に地図を自動でズームさせる
+            if (!snapshot.empty) {
+                map.fitBounds(bounds);
+            }
+            
+            console.log("読み込み完了！表示件数:", snapshot.size);
+        }).catch(err => console.error("エラー:", err));
+}
 
         // 投稿の保存
         document.getElementById('post-form').addEventListener('submit', (e) => {
