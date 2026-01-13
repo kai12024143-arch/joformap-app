@@ -31,52 +31,46 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
-    <script>
-        // Firebase初期化 (HTML内に直接書くことで ReferenceError を防ぎます)
-        const firebaseConfig = {
-            apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
-            authDomain: "joso-13c95.firebaseapp.com",
-            projectId: "joso-13c95",
-            storageBucket: "joso-13c95.firebasestorage.app",
-            messagingSenderId: "659788884587",
-            appId: "1:659788884587:web:39b9a1b840039c24875f2e"
-        };
-        
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
+    <script>  
+      // --- ここから入れ替え ---
+const firebaseConfig = {
+    apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
+    authDomain: "joso-13c95.firebaseapp.com",
+    projectId: "joso-13c95",
+    storageBucket: "joso-13c95.firebasestorage.app",
+    messagingSenderId: "659788884587",
+    appId: "1:659788884587:web:39b9a1b840039c24875f2e"
+};
 
-        let map;
-        let isEmergencyMode = false;
-        let markers = [];
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.firestore();
 
-        // 地図の初期化
-        function initMap() {
-            map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 14,
-                center: { lat: 35.9897, lng: 139.9791 }
-            });
-            loadPosts(); // 地図ができたら投稿を読み込む
-        }
+let map;
+let isEmergencyMode = false;
+let markers = [];
 
-        // 表示件数4個制限 & まとめて表示する関数
+function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 14,
+        center: { lat: 35.9897, lng: 139.9791 }
+    });
+    loadPosts();
+}
+
 async function loadPosts() {
     console.log("読み込み開始...");
     markers.forEach(m => m.setMap(null));
     markers = [];
 
     try {
-        // ネットワークエラーに備えて1回だけリトライする仕組み
         const snapshot = await db.collection('posts')
             .orderBy('timestamp', 'desc')
             .limit(50)
             .get();
 
-        if (snapshot.empty) {
-            console.log("データが空っぽです");
-            return;
-        }
+        if (snapshot.empty) return;
 
         const groupedPosts = {};
         const bounds = new google.maps.LatLngBounds();
@@ -112,100 +106,57 @@ async function loadPosts() {
             });
 
             const html = group.contents.map(c => 
-                `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important; font-family:sans-serif;">
+                `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important;">
                     <b style="color:red;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
-                    <div style="margin-top:4px; font-size:14px; color:black !important; font-weight:bold;">${c.text}</div>
+                    <div style="margin-top:4px; font-weight:bold; color:black;">${c.text}</div>
                 </div>`
             ).join('');
 
             const infoWindow = new google.maps.InfoWindow({
-                content: `<div style="padding:10px; max-width:220px; background:white; border-radius:8px;">${html}</div>`
+                content: `<div style="padding:10px; max-width:220px; background:white;">${html}</div>`
             });
 
             marker.addListener('click', () => infoWindow.open(map, marker));
             markers.push(marker);
         });
 
-        // 投稿がある場所に強制的にズーム！
+        // 投稿がある場所に強制的に移動！
         map.fitBounds(bounds);
-        
-        // ズームしすぎ防止
-        const listener = google.maps.event.addListener(map, "idle", function() { 
-            if (map.getZoom() > 16) map.setZoom(16); 
-            google.maps.event.removeListener(listener); 
-        });
-
-        console.log("ついに表示成功！件数:", snapshot.size);
+        console.log("ついに表示成功！");
 
     } catch (err) {
-        console.error("エラー発生:", err);
-        // 通信エラーなら3秒後に一度だけ自動リトライ
-        setTimeout(loadPosts, 3000);
+        console.error("エラー:", err);
+        setTimeout(loadPosts, 3000); // 失敗しても3秒後に自動リトライ
     }
 }
 
-                // 文字色を強制的に「黒」にし、枠をつけて見やすくしました
-                const html = group.contents.map(c => 
-                    `<div style="border-bottom:1px solid #ccc; padding:8px; color:black !important; font-family:sans-serif;">
-                        <b style="color:red;">[${c.category}]</b> <small style="color:#666;">${c.time}</small><br>
-                        <div style="margin-top:4px; font-size:14px; color:black !important;">${c.text}</div>
-                    </div>`
-                ).join('');
+// 投稿ボタンの設定
+document.getElementById('post-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const text = document.getElementById('post-text').value;
+    if (!text.trim()) return;
 
-                const infoWindow = new google.maps.InfoWindow({
-                    content: `<div style="padding:10px; max-width:200px; background:white;">${html}</div>`
-                });
+    navigator.geolocation.getCurrentPosition((pos) => {
+        const lat = Math.round(pos.coords.latitude * 1000) / 1000;
+        const lng = Math.round(pos.coords.longitude * 1000) / 1000;
+        const cat = isEmergencyMode ? document.querySelector('input[name="category"]:checked')?.value : "通常";
 
-                marker.addListener('click', () => infoWindow.open(map, marker));
-                markers.push(marker);
-            });
+        db.collection('posts').add({
+            text: text, lat: lat, lng: lng, category: cat || "通常",
+            mode: isEmergencyMode ? 'emergency' : 'normal',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).then(() => {
+            alert("投稿成功！");
+            document.getElementById('post-text').value = '';
+            loadPosts();
+        }).catch(err => alert("エラー！F12のリンクをクリックしてください"));
+    });
+});
 
-            // 投稿がある場所に地図を自動でズームさせる
-            if (!snapshot.empty) {
-                map.fitBounds(bounds);
-            }
-            
-            console.log("読み込み完了！表示件数:", snapshot.size);
-        }).catch(err => console.error("エラー:", err));
-}
-
-        // 投稿の保存
-        document.getElementById('post-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const text = document.getElementById('post-text').value;
-            if (!text.trim()) return;
-
-            navigator.geolocation.getCurrentPosition((pos) => {
-                const lat = Math.round(pos.coords.latitude * 1000) / 1000;
-                const lng = Math.round(pos.coords.longitude * 1000) / 1000;
-                const categoryEl = document.querySelector('input[name="category"]:checked');
-                const category = isEmergencyMode && categoryEl ? categoryEl.value : "通常";
-
-                db.collection('posts').add({
-                    text: text, lat: lat, lng: lng, category: category,
-                    mode: isEmergencyMode ? 'emergency' : 'normal',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                }).then(() => {
-                    alert("投稿しました！");
-                    document.getElementById('post-text').value = '';
-                    loadPosts();
-                }).catch(err => {
-                    console.error("保存失敗:", err);
-                    alert("エラー：コンソール(F12)を確認して、リンクがあればクリックしてインデックスを作成してください。");
-                });
-            }, () => alert("位置情報をオンにしてください"));
-        });
-
-        // モード切替
-        document.getElementById('mode-toggle').addEventListener('click', () => {
-            isEmergencyMode = !isEmergencyMode;
-            document.getElementById('mode-toggle').textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
-            document.getElementById('emergency-categories').style.display = isEmergencyMode ? 'flex' : 'none';
-            document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : '#f9f9f9';
-        });
-    </script>
-
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB7hvh-OUCTVM62geqN543IMtgEWl-eeTQ&callback=initMap"></script>
-
-</body>
-</html>
+// モード切替
+document.getElementById('mode-toggle').addEventListener('click', () => {
+    isEmergencyMode = !isEmergencyMode;
+    document.getElementById('mode-toggle').textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
+    document.getElementById('emergency-categories').style.display = isEmergencyMode ? 'flex' : 'none';
+    document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : '#f9f9f9';
+});
