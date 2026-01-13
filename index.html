@@ -32,9 +32,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // --- ここからプログラム本体 ---
-        
-        // Firebase初期化
+        // Firebase初期化 (HTML内に直接書くことで ReferenceError を防ぎます)
         const firebaseConfig = {
             apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
             authDomain: "joso-13c95.firebaseapp.com",
@@ -53,19 +51,17 @@
         let isEmergencyMode = false;
         let markers = [];
 
-        // 地図の初期化（Google Mapsが読み込まれたら自動で動く）
+        // 地図の初期化
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 zoom: 14,
                 center: { lat: 35.9897, lng: 139.9791 }
             });
-            // 地図ができたら投稿を表示
-            loadPosts();
+            loadPosts(); // 地図ができたら投稿を読み込む
         }
 
-        // 投稿を読み込んで表示する命令
+        // 表示件数4個制限 & まとめて表示する関数
         function loadPosts() {
-            // 古いマーカーを消す
             markers.forEach(m => m.setMap(null));
             markers = [];
 
@@ -82,7 +78,7 @@
                         if (!groupedPosts[posKey]) {
                             groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
                         }
-                        // 同じ場所に最大4件まで表示
+                        // 同じ場所に最大4件まで
                         if (groupedPosts[posKey].contents.length < 4) {
                             groupedPosts[posKey].contents.push({
                                 text: data.text,
@@ -113,13 +109,13 @@
                         marker.addListener('click', () => infoWindow.open(map, marker));
                         markers.push(marker);
                     });
-                    console.log("読み込み成功！");
+                    console.log("再読み込み完了！現在の表示地点数:", Object.keys(groupedPosts).length);
                 }).catch(err => {
-                    console.error("読み込みエラー:", err);
+                    console.error("読み込み失敗:", err);
                 });
         }
 
-        // 投稿保存
+        // 投稿の保存
         document.getElementById('post-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const text = document.getElementById('post-text').value;
@@ -141,12 +137,12 @@
                     loadPosts();
                 }).catch(err => {
                     console.error("保存失敗:", err);
-                    alert("エラー：コンソールのリンクからインデックスを作成してください");
+                    alert("エラー：コンソール(F12)を確認して、リンクがあればクリックしてインデックスを作成してください。");
                 });
-            }, () => alert("位置情報を許可してください"));
+            }, () => alert("位置情報をオンにしてください"));
         });
 
-        // モード切り替え
+        // モード切替
         document.getElementById('mode-toggle').addEventListener('click', () => {
             isEmergencyMode = !isEmergencyMode;
             document.getElementById('mode-toggle').textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
