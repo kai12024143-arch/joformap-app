@@ -1,4 +1,6 @@
-// 1. 基本設定
+// ==========================================
+// 1. 基本設定と変数
+// ==========================================
 const db = firebase.firestore();
 const postForm = document.getElementById('post-form');
 const postText = document.getElementById('post-text');
@@ -8,21 +10,26 @@ const emergencyCategories = document.getElementById('emergency-categories');
 
 let map;
 let isEmergencyMode = false;
-let markers = []; // マーカーを管理する配列
+let markers = []; // 地図上のマーカーを管理
 
-// 2. 地図の初期化
+// ==========================================
+// 2. 地図の初期化 (Google Mapsが呼ぶ)
+// ==========================================
 function initMap() {
-    const initialPos = { lat: 35.9897, lng: 139.9791 }; 
+    const initialPos = { lat: 35.9897, lng: 139.9791 }; // 常総市付近
     map = new google.maps.Map(mapElement, {
         zoom: 12,
         center: initialPos,
     });
-    loadPosts(); // 地図ができたら投稿を読み込む
+    // 地図ができたら投稿を読み込む
+    loadPosts();
 }
 
-// 3. 投稿を読み込んで「4個まで」まとめる関数
+// ==========================================
+// 3. 投稿を読み込んで表示する (これがエラーの原因でした)
+// ==========================================
 function loadPosts() {
-    // 古いマーカーを消す
+    // 古いマーカーを全部消す
     markers.forEach(m => m.setMap(null));
     markers = [];
 
@@ -36,15 +43,20 @@ function loadPosts() {
         .then(snapshot => {
             const groupedPosts = {};
 
+            // 座標ごとに投稿をまとめる
             snapshot.forEach(doc => {
                 const data = doc.data();
-                // 座標をキーにしてグループ化
                 const posKey = `${data.lat}_${data.lng}`;
                 
                 if (!groupedPosts[posKey]) {
-                    groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
+                    groupedPosts[posKey] = { 
+                        lat: data.lat, 
+                        lng: data.lng, 
+                        mode: data.mode, 
+                        contents: [] 
+                    };
                 }
-                // 1つの場所に4つまで貯める
+                // 1つの場所に最大4件まで貯める
                 if (groupedPosts[posKey].contents.length < 4) {
                     groupedPosts[posKey].contents.push({
                         text: data.text,
@@ -54,7 +66,7 @@ function loadPosts() {
                 }
             });
 
-            // まとめたグループごとにマーカーを作成
+            // まとめたグループをマーカーとして地図に置く
             Object.values(groupedPosts).forEach(group => {
                 const marker = new google.maps.Marker({
                     position: { lat: group.lat, lng: group.lng },
@@ -69,7 +81,7 @@ function loadPosts() {
                     }
                 });
 
-                // 吹き出しの中身を作る
+                // 吹き出し（インフォウィンドウ）の中身を作成
                 const html = group.contents.map(c => 
                     `<div style="border-bottom:1px solid #eee; padding:5px; color:black; min-width:150px;">
                         <b>[${c.category}]</b> <small>${c.time}</small><br>${c.text}
@@ -85,7 +97,9 @@ function loadPosts() {
         .catch(err => console.error("読み込みエラー:", err));
 }
 
-// 4. 投稿を保存する関数（4個制限付き）
+// ==========================================
+// 4. 投稿を保存する (4個制限)
+// ==========================================
 async function savePost(lat, lng) {
     const categoryElement = document.querySelector('input[name="category"]:checked');
     const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
@@ -98,7 +112,7 @@ async function savePost(lat, lng) {
             .orderBy('timestamp', 'asc')
             .get();
 
-        // 4個以上なら古いものを消す
+        // 4個以上なら古い順に消す
         if (sameLocationPosts.size >= 4) {
             const deleteCount = sameLocationPosts.size - 3; 
             for (let i = 0; i < deleteCount; i++) {
@@ -106,7 +120,7 @@ async function savePost(lat, lng) {
             }
         }
 
-        // 新規投稿
+        // 新しく保存
         await db.collection('posts').add({
             text: postText.value,
             lat: lat,
@@ -116,25 +130,29 @@ async function savePost(lat, lng) {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        alert("投稿しました！クリックすると最大4件表示されます。");
+        alert("投稿しました！");
         postText.value = '';
-        loadPosts(); // 再描画
+        loadPosts(); // 地図を更新
 
     } catch (error) {
-        console.error("保存エラー:", error);
+        console.error("保存失敗:", error);
+        alert("エラー：Firebaseのインデックス作成が必要かもしれません。コンソールを確認してください。");
     }
 }
 
-// 5. 位置情報の取得とボタン設定
+// ==========================================
+// 5. イベント設定
+// ==========================================
 postForm.addEventListener('submit', (e) => {
     e.preventDefault();
     if (!postText.value.trim()) return;
 
     navigator.geolocation.getCurrentPosition((pos) => {
+        // 座標を少し丸める（約100m範囲でまとめるため）
         const lat = Math.round(pos.coords.latitude * 1000) / 1000;
         const lng = Math.round(pos.coords.longitude * 1000) / 1000;
         savePost(lat, lng);
-    }, (err) => alert("位置情報を許可してください"));
+    }, (err) => alert("位置情報をオンにしてください"));
 });
 
 modeToggle.addEventListener('click', () => {
