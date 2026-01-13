@@ -6,17 +6,19 @@
     <title>常総コミュニティ防災プラットフォーム</title>
     <style>
         #map { height: 600px; width: 100%; border: 2px solid #333; margin-bottom: 20px; }
-        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-        #post-text { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; }
-        #emergency-categories { display: none; gap: 15px; margin-bottom: 15px; padding: 10px; background-color: #ffe0e0; border-radius: 5px; }
-        #emergency-categories label { display: inline-flex; align-items: center; padding: 5px 10px; border: 1px solid #ff4444; background-color: white; border-radius: 5px; color: #d32f2f; cursor: pointer; font-weight: bold; }
-        #mode-toggle { padding: 10px 20px; font-size: 16px; margin-bottom: 15px; cursor: pointer; }
+        body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background-color: #f9f9f9; }
+        #post-text { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; padding: 10px; }
+        #emergency-categories { display: none; gap: 10px; margin-bottom: 15px; padding: 10px; background-color: #ffe0e0; border-radius: 5px; flex-wrap: wrap; }
+        #emergency-categories label { padding: 8px 12px; border: 1px solid #ff4444; background: white; border-radius: 5px; cursor: pointer; color: #d32f2f; font-weight: bold; }
+        button { cursor: pointer; background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+        button:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
 
     <div id="map"></div>
-    <button id="mode-toggle">非常時モードに切り替え</button>
+    <button id="mode-toggle" style="margin-bottom: 15px;">非常時モードに切り替え</button>
+
     <form id="post-form">
         <textarea id="post-text" placeholder="状況をつぶやいてください..."></textarea>
         <div id="emergency-categories">
@@ -24,14 +26,14 @@
             <label><input type="radio" name="category" value="被害あり"> 被害あり</label>
             <label><input type="radio" name="category" value="支援要請"> 支援要請</label>
         </div>
-        <button type="submit" style="padding:10px 20px; font-size:16px;">投稿（位置情報必須）</button>
+        <button type="submit" style="width: 100%; background: #007bff;">投稿（位置情報必須）</button>
     </form>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // Firebase初期化
+        // Firebase初期化 (ここを1つにまとめることで読み込みミスを防ぎます)
         const firebaseConfig = {
             apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
             authDomain: "joso-13c95.firebaseapp.com",
@@ -50,22 +52,20 @@
         // 地図の初期化
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 12,
+                zoom: 14,
                 center: { lat: 35.9897, lng: 139.9791 }
             });
             loadPosts();
         }
 
-        // 投稿を読み込んで1つの窓にまとめる関数
+        // 表示件数4個制限 & 吹き出し表示
         function loadPosts() {
             markers.forEach(m => m.setMap(null));
             markers = [];
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
 
             db.collection('posts')
-                .where('timestamp', '>', timestampThreshold)
                 .orderBy('timestamp', 'desc')
+                .limit(50) // 直近50件を取得して同じ座標をまとめる
                 .get()
                 .then(snapshot => {
                     const groupedPosts = {};
@@ -78,8 +78,8 @@
                         if (groupedPosts[posKey].contents.length < 4) {
                             groupedPosts[posKey].contents.push({
                                 text: data.text,
-                                category: data.category,
-                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : ''
+                                category: data.category || "通常",
+                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : '不明'
                             });
                         }
                     });
@@ -94,71 +94,57 @@
                                 fillOpacity: 0.8, scale: 10, strokeColor: 'white', strokeWeight: 2
                             }
                         });
+
                         const html = group.contents.map(c => 
                             `<div style="border-bottom:1px solid #eee; padding:5px; color:black;">
                                 <b>[${c.category}]</b> <small>${c.time}</small><br>${c.text}
                             </div>`
                         ).join('');
-                        const infoWindow = new google.maps.InfoWindow({ content: `<div style="min-width:150px">${html}</div>` });
+
+                        const infoWindow = new google.maps.InfoWindow({ content: `<div style="min-width:180px">${html}</div>` });
                         marker.addListener('click', () => infoWindow.open(map, marker));
                         markers.push(marker);
                     });
                 }).catch(err => {
-                    console.error("読み込み失敗:", err);
-                    alert("Firebaseコンソールで『インデックス作成』が必要です。コンソールのリンクをクリックしてください。");
+                    console.error("読み込みエラー:", err);
+                    // リンクが出たらそこをクリックしてインデックス作成！
                 });
         }
 
-        // 投稿を保存する関数 (4個制限)
-        async function savePost(lat, lng) {
-            const categoryElement = document.querySelector('input[name="category"]:checked');
-            const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
-            const postText = document.getElementById('post-text');
-
-            try {
-                const sameLocationPosts = await db.collection('posts')
-                    .where('lat', '==', lat)
-                    .where('lng', '==', lng)
-                    .orderBy('timestamp', 'asc').get();
-
-                if (sameLocationPosts.size >= 4) {
-                    const deleteCount = sameLocationPosts.size - 3; 
-                    for (let i = 0; i < deleteCount; i++) {
-                        await sameLocationPosts.docs[i].ref.delete();
-                    }
-                }
-
-                await db.collection('posts').add({
-                    text: postText.value, lat: lat, lng: lng, category: category,
-                    mode: isEmergencyMode ? 'emergency' : 'normal',
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                alert("投稿しました！同じ場所で最大4個まで表示されます。");
-                postText.value = '';
-                loadPosts();
-            } catch (error) {
-                console.error("保存失敗:", error);
-                alert("エラーが発生しました。コンソールを確認してください。");
-            }
-        }
-
-        // ボタンの動作設定
-        document.getElementById('post-form').addEventListener('submit', (e) => {
+        // 投稿保存
+        document.getElementById('post-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const text = document.getElementById('post-text').value;
             if (!text.trim()) return;
-            navigator.geolocation.getCurrentPosition((pos) => {
+
+            navigator.geolocation.getCurrentPosition(async (pos) => {
                 const lat = Math.round(pos.coords.latitude * 1000) / 1000;
                 const lng = Math.round(pos.coords.longitude * 1000) / 1000;
-                savePost(lat, lng);
-            }, (err) => alert("位置情報をオンにしてください"));
+                const categoryEl = document.querySelector('input[name="category"]:checked');
+                const category = isEmergencyMode && categoryEl ? categoryEl.value : "通常";
+
+                try {
+                    await db.collection('posts').add({
+                        text: text, lat: lat, lng: lng, category: category,
+                        mode: isEmergencyMode ? 'emergency' : 'normal',
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    alert("投稿成功！");
+                    document.getElementById('post-text').value = '';
+                    loadPosts();
+                } catch (err) {
+                    console.error("保存失敗:", err);
+                    alert("エラー！コンソールのリンクをクリックしてインデックスを作成してください");
+                }
+            }, () => alert("位置情報を許可してください"));
         });
 
+        // モード切り替え
         document.getElementById('mode-toggle').addEventListener('click', () => {
             isEmergencyMode = !isEmergencyMode;
             document.getElementById('mode-toggle').textContent = isEmergencyMode ? '通常モードに戻す' : '非常時モードに切り替え';
             document.getElementById('emergency-categories').style.display = isEmergencyMode ? 'flex' : 'none';
-            document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : 'white';
+            document.body.style.backgroundColor = isEmergencyMode ? '#fff0f0' : '#f9f9f9';
         });
     </script>
 
