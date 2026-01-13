@@ -68,37 +68,38 @@ async function savePost(lat, lng) {
     const categoryElement = document.querySelector('input[name="category"]:checked');
     const category = isEmergencyMode && categoryElement ? categoryElement.value : "通常";
     
-    // 24時間前の時刻
+    // 現在時刻から24時間前を計算
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const timestampThreshold = firebase.firestore.Timestamp.fromDate(twentyFourHoursAgo);
 
     try {
-        // ① 【24時間削除】古い投稿を削除
+        // ① 【24時間期限切れ削除】
         const oldPosts = await db.collection('posts')
             .where('timestamp', '<', timestampThreshold)
             .get();
         
         const deleteBatch = db.batch();
-        oldPosts.forEach(doc => {
-            deleteBatch.delete(doc.ref);
-        });
+        oldPosts.forEach(doc => deleteBatch.delete(doc.ref));
         await deleteBatch.commit();
 
-        // ② 【20個制限】同じ場所の投稿を確認
+        // ② 【4個制限の処理】ここが重要です！
+        // 同じ場所（lat, lng）にある投稿を古い順に取得
         const sameLocationPosts = await db.collection('posts')
             .where('lat', '==', lat)
             .where('lng', '==', lng)
             .orderBy('timestamp', 'asc')
             .get();
 
-        if (sameLocationPosts.size >= 20) {
-            const deleteCount = sameLocationPosts.size - 19; 
+        // すでに4個以上あるなら、一番古いものを消して「空き」を作る
+        if (sameLocationPosts.size >= 4) {
+            // sizeが4なら1個、5なら2個消す（常に最新の3個を残して、今回ので4個にする）
+            const deleteCount = sameLocationPosts.size - 3; 
             for (let i = 0; i < deleteCount; i++) {
                 await sameLocationPosts.docs[i].ref.delete();
             }
         }
 
-        // ③ 新しい投稿を保存
+        // ③ 新しい投稿（4個目、または空きができた枠）を保存
         await db.collection('posts').add({
             text: postText.value,
             lat: lat,
@@ -108,13 +109,19 @@ async function savePost(lat, lng) {
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
 
-        alert("投稿しました！");
-        postText.value = '';
+        alert("投稿しました！同じ場所で最大4個まで表示されます。");
+        postText.value = ''; 
+        
+        // 地図上のマーカーを一度全部リセットしてから再描画
+        if (typeof markers !== 'undefined') {
+            markers.forEach(m => m.setMap(null));
+            markers = [];
+        }
         loadPosts();
 
     } catch (error) {
-        console.error("Error:", error);
-        alert("エラーが発生しました。コンソールを確認してください。\n(Firebaseのインデックス作成が必要な場合があります)");
+        console.error("Save Error: ", error);
+        alert("エラーが発生しました。コンソール（F12）のリンクを確認してください。");
     }
 }
 
