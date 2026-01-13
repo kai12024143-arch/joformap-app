@@ -8,10 +8,9 @@
         #map { height: 600px; width: 100%; border: 2px solid #333; margin-bottom: 20px; }
         body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; background-color: #f9f9f9; }
         #post-text { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; padding: 10px; }
-        #emergency-categories { display: none; gap: 10px; margin-bottom: 15px; padding: 10px; background-color: #ffe0e0; border-radius: 5px; flex-wrap: wrap; }
+        #emergency-categories { display: none; gap: 10px; margin-bottom: 15px; padding: 10px; background-color: #ffe0e0; border-radius: 5px; }
         #emergency-categories label { padding: 8px 12px; border: 1px solid #ff4444; background: white; border-radius: 5px; cursor: pointer; color: #d32f2f; font-weight: bold; }
         button { cursor: pointer; background: #333; color: white; border: none; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
-        button:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -33,7 +32,9 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
     <script>
-        // Firebase初期化 (ここを1つにまとめることで読み込みミスを防ぎます)
+        // --- ここからプログラム本体 ---
+        
+        // Firebase初期化
         const firebaseConfig = {
             apiKey: "AIzaSyBMOr6Kag-PCGL6piRVtjCDukk01aurb1M",
             authDomain: "joso-13c95.firebaseapp.com",
@@ -42,44 +43,51 @@
             messagingSenderId: "659788884587",
             appId: "1:659788884587:web:39b9a1b840039c24875f2e"
         };
-        firebase.initializeApp(firebaseConfig);
+        
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
 
         let map;
         let isEmergencyMode = false;
         let markers = [];
 
-        // 地図の初期化
+        // 地図の初期化（Google Mapsが読み込まれたら自動で動く）
         function initMap() {
             map = new google.maps.Map(document.getElementById('map'), {
                 zoom: 14,
                 center: { lat: 35.9897, lng: 139.9791 }
             });
+            // 地図ができたら投稿を表示
             loadPosts();
         }
 
-        // 表示件数4個制限 & 吹き出し表示
+        // 投稿を読み込んで表示する命令
         function loadPosts() {
+            // 古いマーカーを消す
             markers.forEach(m => m.setMap(null));
             markers = [];
 
             db.collection('posts')
                 .orderBy('timestamp', 'desc')
-                .limit(50) // 直近50件を取得して同じ座標をまとめる
+                .limit(50)
                 .get()
                 .then(snapshot => {
                     const groupedPosts = {};
                     snapshot.forEach(doc => {
                         const data = doc.data();
                         const posKey = `${data.lat}_${data.lng}`;
+                        
                         if (!groupedPosts[posKey]) {
                             groupedPosts[posKey] = { lat: data.lat, lng: data.lng, mode: data.mode, contents: [] };
                         }
+                        // 同じ場所に最大4件まで表示
                         if (groupedPosts[posKey].contents.length < 4) {
                             groupedPosts[posKey].contents.push({
                                 text: data.text,
                                 category: data.category || "通常",
-                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : '不明'
+                                time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : ''
                             });
                         }
                     });
@@ -105,37 +113,36 @@
                         marker.addListener('click', () => infoWindow.open(map, marker));
                         markers.push(marker);
                     });
+                    console.log("読み込み成功！");
                 }).catch(err => {
                     console.error("読み込みエラー:", err);
-                    // リンクが出たらそこをクリックしてインデックス作成！
                 });
         }
 
         // 投稿保存
-        document.getElementById('post-form').addEventListener('submit', async (e) => {
+        document.getElementById('post-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const text = document.getElementById('post-text').value;
             if (!text.trim()) return;
 
-            navigator.geolocation.getCurrentPosition(async (pos) => {
+            navigator.geolocation.getCurrentPosition((pos) => {
                 const lat = Math.round(pos.coords.latitude * 1000) / 1000;
                 const lng = Math.round(pos.coords.longitude * 1000) / 1000;
                 const categoryEl = document.querySelector('input[name="category"]:checked');
                 const category = isEmergencyMode && categoryEl ? categoryEl.value : "通常";
 
-                try {
-                    await db.collection('posts').add({
-                        text: text, lat: lat, lng: lng, category: category,
-                        mode: isEmergencyMode ? 'emergency' : 'normal',
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    alert("投稿成功！");
+                db.collection('posts').add({
+                    text: text, lat: lat, lng: lng, category: category,
+                    mode: isEmergencyMode ? 'emergency' : 'normal',
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    alert("投稿しました！");
                     document.getElementById('post-text').value = '';
                     loadPosts();
-                } catch (err) {
+                }).catch(err => {
                     console.error("保存失敗:", err);
-                    alert("エラー！コンソールのリンクをクリックしてインデックスを作成してください");
-                }
+                    alert("エラー：コンソールのリンクからインデックスを作成してください");
+                });
             }, () => alert("位置情報を許可してください"));
         });
 
