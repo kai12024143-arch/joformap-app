@@ -128,11 +128,9 @@ async function savePost(lat, lng) {
 // ----------------------------------------------------
 // 4. 投稿を読み込む関数
 // ----------------------------------------------------
-// マーカーを管理する配列（関数の外、一番上に置いてください）
 let markers = []; 
 
 function loadPosts() {
-    // ① 地図上の古いマーカーをすべて消して空にする
     markers.forEach(m => m.setMap(null));
     markers = [];
 
@@ -141,42 +139,71 @@ function loadPosts() {
 
     db.collection('posts')
         .where('timestamp', '>', timestampThreshold)
-        .orderBy('timestamp', 'desc') // 新しい順に取得
-        .limit(50)
+        .orderBy('timestamp', 'desc')
+        .limit(100) // 多めに取得
         .get()
         .then(snapshot => {
-            let i = 0;
+            // --- 同じ場所の投稿をまとめる処理 ---
+            const groupedPosts = {};
+
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const markerColor = data.mode === 'emergency' ? 'red' : 'blue';
+                const posKey = `${data.lat}_${data.lng}`; // 座標を合体させてキーにする
+                
+                if (!groupedPosts[posKey]) {
+                    groupedPosts[posKey] = {
+                        lat: data.lat,
+                        lng: data.lng,
+                        mode: data.mode,
+                        contents: []
+                    };
+                }
+                // 1つの場所に最大4つまで中身を貯める
+                if (groupedPosts[posKey].contents.length < 4) {
+                    groupedPosts[posKey].contents.push({
+                        text: data.text,
+                        category: data.category,
+                        time: data.timestamp ? new Date(data.timestamp.toDate()).toLocaleTimeString() : ''
+                    });
+                }
+            });
 
-                // ② zIndex（重ね順）を設定。新しいほど数字を大きくして手前に出す
+            // --- まとめたデータを地図に表示 ---
+            Object.values(groupedPosts).forEach(group => {
+                const markerColor = group.mode === 'emergency' ? 'red' : 'blue';
+
                 const marker = new google.maps.Marker({
-                    position: { lat: data.lat, lng: data.lng },
+                    position: { lat: group.lat, lng: group.lng },
                     map: map,
-                    zIndex: 1000 - i, // これで最新が一番上にくる
                     icon: {
                         path: google.maps.SymbolPath.CIRCLE,
                         fillColor: markerColor,
                         fillOpacity: 0.9,
-                        scale: 8,
+                        scale: 10, // 少し大きくして目立たせる
                         strokeColor: 'white',
                         strokeWeight: 2
                     }
                 });
 
-                markers.push(marker);
-                i++;
+                // 4つの投稿をリスト形式で作成
+                const htmlContent = group.contents.map(c => 
+                    `<div style="border-bottom:1px solid #ccc; padding:5px; color:black;">
+                        <span style="font-weight:bold; color:red;">[${c.category}]</span> 
+                        <small>${c.time}</small><br>${c.text}
+                    </div>`
+                ).join('');
 
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `<div style="color:black;"><strong>[${data.category}]</strong><br>${data.text}</div>`
+                    content: `<div style="max-width:200px;">${htmlContent}</div>`
                 });
 
                 marker.addListener('click', () => {
                     infoWindow.open(map, marker);
                 });
+
+                markers.push(marker);
             });
-            console.log("再読み込み完了！現在の表示件数:", markers.length);
+            console.log("表示更新完了！");
         });
 }
 // ----------------------------------------------------
